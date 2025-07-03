@@ -1,165 +1,56 @@
-import os
+import os, pprint
+from langchain_openai import OpenAIEmbeddings, OpenAI
 from langchain_community.vectorstores import FAISS
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.document_loaders import PyPDFLoader
-from langchain_community.docstore.in_memory import InMemoryDocstore
-from pprint import pprint
+from langchain.schema.runnable import RunnableLambda
+from langchain.document_transformers import LongContextReorder
+
+
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+from functools import partial
+
 from dotenv import load_dotenv
-
-from faiss import IndexFlatL2
-
 load_dotenv()
-OPEN_AI_API_KEY = os.getenv("OPEN_AI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPEN_AI_API_KEY")
 
-embedder = OpenAIEmbeddings(model='text-embedding-3-small', openai_api_key=OPEN_AI_API_KEY)
-
-# 1. Define text splitter
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,
-    chunk_overlap=100,
-    separators=["\n\n", "\n", ".", ";", ",", " "]
-)
-
-print('Loading Documents...')
-
-# 2. Load and flatten documents
-docs = []
-file_paths = [
-    "undergrad_booklets/EngUndergrad.pdf",
-    "undergrad_booklets/FoodAgriUndergrad.pdf",
-    "undergrad_booklets/HumanitiesUndergrad.pdf",
-    "undergrad_booklets/LawUndergrad.pdf",
-    "undergrad_booklets/MedicalSciencesUndergrad.pdf",
-    "undergrad_booklets/ScienceTechUndergrad.pdf",
-    "undergrad_booklets/SocsciUndergrad.pdf",
-    "undergrad_booklets/SportUndergrad.pdf",
-    "undergrad_booklets/IGDS.pdf",
-    "undergrad_booklets/UWI_FAQ.pdf"
-]
-
-info_map = {
-    "EngUndergrad.pdf": {
-        "title": "Faculty of Engineering Undergraduate Handbook",
-        "faculty": "Engineering",
-        "abbreviation": "FOE"
-    },
-    "FoodAgriUndergrad.pdf": {
-        "title": "Faculty of Food & Agriculture Handbook",
-        "faculty": "Food & Agriculture",
-        "abbreviation": "FFA"
-    },
-    "HumanitiesUndergrad.pdf": {
-        "title": "Faculty of Humanities and Education Handbook",
-        "faculty": "Humanities and Education",
-        "abbreviation": "FHE"
-    },
-    "LawUndergrad.pdf": {
-        "title": "Faculty of Law Handbook",
-        "faculty": "Law",
-        "abbreviation": "LLB"
-    },
-    "MedicalSciencesUndergrad.pdf": {
-        "title": "Faculty of Medical Sciences Handbook",
-        "faculty": "Medical Sciences",
-        "abbreviation": "FMS"
-    },
-    "ScienceTechUndergrad.pdf": {
-        "title": "Faculty of Science and Technology Handbook",
-        "faculty": "Science and Technology",
-        "abbreviation": "FST"
-    },
-    "SocsciUndergrad.pdf": {
-        "title": "Faculty of Social Sciences Handbook",
-        "faculty": "Social Sciences",
-        "abbreviation": "FSS"
-    },
-    "SportUndergrad.pdf": {
-        "title": "Faculty of Sport Handbook",
-        "faculty": "Sport",
-        "abbreviation": "FSP"
-    },
-    "IGDS.pdf": {
-        "title": "Institute for Gender and Development Studies Handbook",
-        "faculty": "Gender and Development Studies",
-        "abbreviation": "IGDS"
-    },
-    "UWI_FAQ.pdf": {
-        "title": "University of the West Indies FAQ Document",
-        "faculty": "General",
-        "abbreviation": "UWI"
-    }
-}
+instruct_llm = OpenAI(model="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)
+embedder = OpenAIEmbeddings(model="text-embedding-3-small", openai_api_key=OPENAI_API_KEY)
 
 
-for path in file_paths:
-    docs.extend(PyPDFLoader(path).load())
+## Utility Functions to make life easier
+def RPrint(preface=""):
+    def print_and_return(x, preface):
+        if preface: print(preface, end="")
+        pprint(x)
+        return x
+    return RunnableLambda(partial(print_and_return, preface=preface))
 
-print("Chunking documents...")
+def doc2str(docs, title=""):
+    out_str = ""
+    for doc in docs:
+        doc_name = getattr(doc, 'metadata', {}).get('Title', title)
+        if doc_name:
+            out_str += f"[Quote from {doc_name}]"
+        out_str += getattr(doc, 'page_content', str(doc)) + "\n"
+    return out_str
 
-# 3. Split all documents into chunks
-docs_chunks = text_splitter.split_documents(docs)
+long_reorder = RunnableLambda(LongContextReorder().transform_documents)
 
-# 4. Enrich metadata and prepare document summary
-doc_string = "Available Documents"
-doc_metadata = []
-essential_keys = ['source', 'page', 'title', 'total_pages', 'faculty', 'abbreviation']
+# Load the vector store
+print('Loading Vectorstore...')
+docstore = FAISS.load_local("faiss_store/uwi_faq_faiss_index", embeddings=embedder, allow_dangerous_deserialization=True)
+print('Vectorstore Loaded!')
 
-seen_sources = set()
+# Create chat prompt
+chat_prompt = ChatPromptTemplate.from_messages([("system",
+        "You are a dcoument chatbot. Help the user as they ask questions about the documents."
+        "User messaged just asked: {input}\n\n"
+        "Conversation History Retrieval:\n{history}\n\n"
+        "Document Retrieval:\n{context}\n\n"
+        "(Answer only from retrieval. Make your responses conversational. If you do not know a response,"
+        "tell the user to contact Student Administration and provide their contact)"),
+        ('user', '{input}')])
 
-for chunk in docs_chunks:
-    metadata = getattr(chunk, 'metadata', {})
-    source = metadata.get('source', 'Unknown')
-    filename = source.split('/')[-1]
+stream_chain = chat_prompt | RPrint() | instruct_llm | StrOutputParser()
 
-    # Enrich metadata from info_map if available
-    extra_info = info_map.get(filename, {})
-    chunk.metadata.update(extra_info)
-
-    # Filter metadata keys
-    chunk.metadata = {k: v for k, v in chunk.metadata.items() if k in essential_keys}
-
-    # Build doc_string summary using titles (avoid duplicates)
-    if source not in seen_sources:
-        title = chunk.metadata.get('title', source)
-        doc_string += "\n - " + str(title)
-        doc_metadata.append(str(chunk.metadata))
-        seen_sources.add(source)
-
-# 5. Combine for inspection or embedding
-extra_chunks = [doc_string] + doc_metadata
-
-print("\n--- Summary ---")
-pprint(doc_string)
-
-print("\n--- Sample Chunks ---")
-print(f"Total chunks: {len(docs_chunks)}")
-if docs_chunks:
-    print("Example chunk metadata:")
-    pprint(docs_chunks[0].metadata)
-    print("Example content snippet:")
-    print(docs_chunks[0].page_content[:300], "...")
-
-print('Constructing Vector Store...')
-vectorstore = FAISS.from_documents(docs_chunks, embedder)
-
-# Create an  empty FAISS Index
-embed_dims = len(embedder.embed_query("test"))
-def default_FAISS():
-    return FAISS(
-        embedding_function=embedder,
-        index=IndexFlatL2(embed_dims),
-        docstore=InMemoryDocstore(),
-        index_to_docstore_id={},
-        normalize_L2=False
-    )
-
-#Merge Vector Stores for all documents into one vector store
-def aggregate_vstores(vectorstores):
-    agg_vstores = default_FAISS()
-    for vstore in vectorstores:
-        agg_vstores.merge_from(vstore)
-    return agg_vstores
-
-
-print(f"Constructed aggregate docstore with {len(vectorstore.docstore._dict)} chunks")
