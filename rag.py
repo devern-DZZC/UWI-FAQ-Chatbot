@@ -1,8 +1,18 @@
+import os
 from langchain_community.vectorstores import FAISS
+from langchain.embeddings import OpenAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.document_loaders import PyPDFLoader
-from langchain.schema.document import Document
+from langchain_community.docstore.in_memory import InMemoryDocstore
 from pprint import pprint
+from dotenv import load_dotenv
+
+from faiss import IndexFlatL2
+
+load_dotenv()
+OPEN_AI_API_KEY = os.getenv("OPEN_AI_API_KEY")
+
+embedder = OpenAIEmbeddings(model='text-embedding-3-small', openai_api_key=OPEN_AI_API_KEY)
 
 # 1. Define text splitter
 text_splitter = RecursiveCharacterTextSplitter(
@@ -129,3 +139,27 @@ if docs_chunks:
     pprint(docs_chunks[0].metadata)
     print("Example content snippet:")
     print(docs_chunks[0].page_content[:300], "...")
+
+print('Constructing Vector Store...')
+vectorstore = FAISS.from_documents(docs_chunks, embedder)
+
+# Create an  empty FAISS Index
+embed_dims = len(embedder.embed_query("test"))
+def default_FAISS():
+    return FAISS(
+        embedding_function=embedder,
+        index=IndexFlatL2(embed_dims),
+        docstore=InMemoryDocstore(),
+        index_to_docstore_id={},
+        normalize_L2=False
+    )
+
+#Merge Vector Stores for all documents into one vector store
+def aggregate_vstores(vectorstores):
+    agg_vstores = default_FAISS()
+    for vstore in vectorstores:
+        agg_vstores.merge_from(vstore)
+    return agg_vstores
+
+
+print(f"Constructed aggregate docstore with {len(vectorstore.docstore._dict)} chunks")
