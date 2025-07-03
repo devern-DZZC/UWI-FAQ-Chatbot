@@ -2,6 +2,7 @@ import os, pprint
 from langchain_openai import OpenAIEmbeddings, OpenAI
 from langchain_community.vectorstores import FAISS
 from langchain.schema.runnable import RunnableLambda
+from langchain.schema.runnable.passthrough import RunnableAssign
 from langchain.document_transformers import LongContextReorder
 
 
@@ -53,4 +54,13 @@ chat_prompt = ChatPromptTemplate.from_messages([("system",
         ('user', '{input}')])
 
 stream_chain = chat_prompt | RPrint() | instruct_llm | StrOutputParser()
+
+# Retrieve relevant chunks
+retrieval_chain = (
+    {
+        'context': docstore.as_retriever() | long_reorder | doc2str,
+        'input': (lambda x:x)
+    }
+    | RunnableAssign({'output': chat_prompt | instruct_llm | StrOutputParser()})
+)
 

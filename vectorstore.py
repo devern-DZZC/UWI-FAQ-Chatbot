@@ -1,8 +1,8 @@
 import os
 from langchain_community.vectorstores import FAISS
-from langchain.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.docstore.in_memory import InMemoryDocstore
 from pprint import pprint
 from dotenv import load_dotenv
@@ -16,8 +16,8 @@ embedder = OpenAIEmbeddings(model='text-embedding-3-small', openai_api_key=OPEN_
 
 # 1. Define text splitter
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,
-    chunk_overlap=100,
+    chunk_size=1500,
+    chunk_overlap=200,
     separators=["\n\n", "\n", ".", ";", ",", " "]
 )
 
@@ -107,7 +107,7 @@ essential_keys = ['source', 'page', 'title', 'total_pages', 'faculty', 'abbrevia
 
 seen_sources = set()
 
-for chunk in docs_chunks:
+for i, chunk in enumerate(docs_chunks):
     metadata = getattr(chunk, 'metadata', {})
     source = metadata.get('source', 'Unknown')
     filename = source.split('/')[-1]
@@ -118,6 +118,8 @@ for chunk in docs_chunks:
 
     # Filter metadata keys
     chunk.metadata = {k: v for k, v in chunk.metadata.items() if k in essential_keys}
+
+    chunk.metadata["chunk_index"] = i
 
     # Build doc_string summary using titles (avoid duplicates)
     if source not in seen_sources:
@@ -136,39 +138,68 @@ print("\n--- Sample Chunks ---")
 print(f"Total chunks: {len(docs_chunks)}")
 if docs_chunks:
     print("Example chunk metadata:")
-    pprint(docs_chunks[0].metadata)
+    pprint(docs_chunks[9].metadata)
     print("Example content snippet:")
-    print(docs_chunks[0].page_content[:300], "...")
+    print(docs_chunks[9].page_content[:300], "...")
 
-print('Constructing Vector Store...')
+print('\n\nConstructing Vector Store...')
 vectorstore = FAISS.from_documents(docs_chunks, embedder)
 
-# Create an  empty FAISS Index
-embed_dims = len(embedder.embed_query("test"))
-def default_FAISS():
-    return FAISS(
-        embedding_function=embedder,
-        index=IndexFlatL2(embed_dims),
-        docstore=InMemoryDocstore(),
-        index_to_docstore_id={},
-        normalize_L2=False
-    )
-
-#Merge Vector Stores for all documents into one vector store
-def aggregate_vstores(vectorstores):
-    agg_vstores = default_FAISS()
-    for vstore in vectorstores:
-        agg_vstores.merge_from(vstore)
-    return agg_vstores
-
-
-print(f"Constructed aggregate docstore with {len(vectorstore.docstore._dict)} chunks")
-
-query = "How do i register for an undergraduate program?"
+## Sample Chunk Retrieval
+query = "What courses do I have to take in Level 2 Semester 1. I am doing Computer Science Special"
 query_embedding = embedder.embed_query(query)
-results = vectorstore.similarity_search_by_vector(query_embedding, k=5)
 
-for i, doc in enumerate(results):
+# Get top k results with similarity score
+results_with_scores = vectorstore.similarity_search_with_score_by_vector(query_embedding, k=5)
+
+chunk_dict = vectorstore.docstore._dict
+combined_chunks = []
+
+for i, (doc, score) in enumerate(results_with_scores):
+    base_index = doc.metadata.get("chunk_index")
+    
+    # Set lookahead based on rank
+    if i < 2:
+        current_lookahead = 5
+    else:
+        current_lookahead = 2
+    
+    combined_text = doc.page_content
+    
+    for offset in range(1, current_lookahead + 1):
+        next_index = base_index + offset
+        next_doc = chunk_dict.get(str(next_index))  # assuming keys are stringified ints
+        
+        if next_doc and next_doc.metadata.get("source") == doc.metadata.get("source"):
+            combined_text += "\n\n" + next_doc.page_content
+        else:
+            break  # stop if source changes or chunk missing
+    
+    combined_chunks.append((combined_text, score, doc.metadata))
+
+combined_chunks.sort(key=lambda x: x[1])
+
+
+print(f"Constructed docstore with {len(vectorstore.docstore._dict)} chunks")
+
+for i, (text, score, metadata) in enumerate(combined_chunks):
     print(f"\n--- Result {i+1} ---")
-    print("Metadata:", doc.metadata)
-    print(doc.page_content[:500]) 
+    print("Score:", score)
+    print("Metadata:", metadata)
+    print(text[:800], "..." if len(text) > 800 else "")
+
+
+print("\n--- FULL COMBINED TEXT SENT TO GPT ---\n")
+print(combined_chunks[0][0])
+
+
+"""
+# Uncomment to save Vector Store in this directory
+
+print("\n\nSaving Vector Store...")
+folder = "faiss_store"
+os.makedirs(folder, exist_ok=True)
+vectorstore.save_local(os.path.join(folder, "uwi_faq_faiss_index"))
+print("Vector Store Saved!\n\n")
+
+"""
