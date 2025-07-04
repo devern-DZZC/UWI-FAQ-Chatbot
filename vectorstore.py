@@ -160,7 +160,7 @@ for i, (doc, score) in enumerate(results_with_scores):
     
     # Set lookahead based on rank
     if i < 2:
-        current_lookahead = 5
+        current_lookahead = 4
     else:
         current_lookahead = 2
     
