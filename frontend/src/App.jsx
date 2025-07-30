@@ -11,12 +11,12 @@ export default function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleClick = (question) => {
+  const handleClick = async (question) => {
     setMessages(prev => [...prev, { text: question, isUser: true }]);
-    setTimeout(() => {
-      setMessages(prev => [...prev, { text: getMockAnswer(question), isUser: false }]);
-    }, 500);
+    const answer = await getRealAnswer(question);
+    setMessages(prev => [...prev, { text: answer, isUser: false }]);
   };
+  
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -30,16 +30,17 @@ export default function App() {
     }
   };
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!userInput.trim()) return;
-    
+  
     setMessages(prev => [...prev, { text: userInput, isUser: true }]);
+    const question = userInput;
     setUserInput("");
-    
-    setTimeout(() => {
-      setMessages(prev => [...prev, { text: getMockAnswer(userInput), isUser: false }]);
-    }, 500);
+  
+    const answer = await getRealAnswer(question);
+    setMessages(prev => [...prev, { text: answer, isUser: false }]);
   };
+  
 
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
@@ -148,7 +149,7 @@ export default function App() {
           </div>
         </form>
       </main>
-      <style jsx global>{`
+      <style>{`
         .scrollbar::-webkit-scrollbar {
           width: 8px;
         }
@@ -169,15 +170,21 @@ export default function App() {
 }
 
 // TEMP: Mock response logic for demo
-function getMockAnswer(question) {
-  const answers = {
-    "How do I apply to UWI?":
-      "To apply to UWI, visit the official admissions portal, complete the application form, and submit required documents like transcripts and identification. Deadlines and requirements vary by program.",
-    "How do I register for GATE?":
-      "To register for GATE, you need to follow a few steps. First, make sure you are an eligible undergraduate student under 50 years old and a national of Trinidad & Tobago. Then, visit the GATE Registration Centre (GRC) to register for GATE e-Service. Provide your birth certificate, ID (National ID or passport), and a valid email. You will receive a GATE e-Service ID and password via email. Apply online with scanned documents like your acceptance letter and birth certificate. Select the correct academic period and semester on the e-GATE application form. Finally, print, sign, and submit the Student Copy of the form. If you have any specific questions about registration, it would be best to contact Student Administration for assistance.",
-    "What to do if I have an AR Hold?":
-      "If you have an AR Hold, it usually means there's an outstanding balance on your account. Contact the Bursary or Student Administration to resolve it before continuing with registration or exams.",
-  };
+async function getRealAnswer(question) {
+  try {
+    const res = await fetch("http://localhost:8000/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ question: question }),
+    });
 
-  return answers[question] || "I'll find the answer for you. Please check back soon...";
+    if (!res.ok) throw new Error("API error");
+    const data = await res.json();
+    return data.answer || "Sorry, I couldn't find an answer.";
+  } catch (err) {
+    console.error(err);
+    return "There was an error contacting the server.";
+  }
 }
