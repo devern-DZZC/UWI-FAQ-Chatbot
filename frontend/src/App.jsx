@@ -77,7 +77,7 @@ export default function App() {
                   >
                     <h3 className="font-medium text-white mb-1">Application</h3>
                     <p className="text-gray-300">
-                      How do I apply to <span className="font-semibold text-blue-400">UWI</span>?
+                      How do I apply to UWI?
                     </p>
                   </button>
                   <button
@@ -86,7 +86,7 @@ export default function App() {
                   >
                     <h3 className="font-medium text-white mb-1">GATE Funding</h3>
                     <p className="text-gray-300">
-                      How do I register for <span className="font-semibold text-blue-400">GATE</span>?
+                      How do I register for GATE?
                     </p>
                   </button>
                   <button
