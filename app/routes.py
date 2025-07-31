@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from app.rag_chain import chat_response
+#from app.rag_cohere import chat_response
 
 router = APIRouter()
 
