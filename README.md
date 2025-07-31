@@ -29,8 +29,8 @@ A full-stack AI-powered application that lets users ask natural language questio
 ## 1. Clone the Repo
 
 ```bash
-git clone https://github.com/your-username/rag-ai-app.git
-cd rag-ai-app
+git clone https://github.com/devern-DZZC/UWI-FAQ-Chatbot.git
+cd UWI-FAQ-Chatbot
 ```
 
 2. Backend Setup (FastAPI)
