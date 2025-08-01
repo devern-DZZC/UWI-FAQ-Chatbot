@@ -215,7 +215,7 @@ export default function App() {
 // TEMP: Mock response logic for demo
 async function getRealAnswer(question) {
   try {
-    const res = await fetch("http://localhost:8000/api/chat", {
+    const res = await fetch("/api/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
