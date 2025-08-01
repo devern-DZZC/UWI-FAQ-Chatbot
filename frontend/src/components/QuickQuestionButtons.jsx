@@ -1,4 +1,6 @@
-export default function QuickQuestionButtons({ loading, onClick }) {
+import React from 'react'
+
+const QuickQuestionButtons = ({ loading, onClick }) => {
     const questions = [
       { label: "Application", text: "How do I register at UWI?" },
       { label: "GATE Funding", text: "How do I register for GATE?" },
@@ -33,4 +35,6 @@ export default function QuickQuestionButtons({ loading, onClick }) {
       </div>
     );
   }
+
+export default QuickQuestionButtons;
   

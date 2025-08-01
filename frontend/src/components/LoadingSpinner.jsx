@@ -1,4 +1,6 @@
-export default function LoadingSpinner() {
+import React from 'react'
+
+const LoadingSpinner = () => {
     return (
       <div className="flex justify-center items-center mt-2 text-gray-400">
         <svg
@@ -25,4 +27,6 @@ export default function LoadingSpinner() {
       </div>
     );
   }
+
+  export default LoadingSpinner;
   

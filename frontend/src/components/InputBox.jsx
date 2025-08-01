@@ -1,4 +1,6 @@
-export default function InputBox({ userInput, setUserInput, sendMessage, loading }) {
+import React from 'react'
+
+const InputBox = ({ userInput, setUserInput, sendMessage, loading }) => {
     const handleSubmit = (e) => {
       e.preventDefault();
       sendMessage();
@@ -37,4 +39,6 @@ export default function InputBox({ userInput, setUserInput, sendMessage, loading
       </form>
     );
   }
+
+export default InputBox;
   

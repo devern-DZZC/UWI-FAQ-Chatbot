@@ -1,4 +1,6 @@
-export default function ChatMessage({ message }) {
+import React from 'react'
+
+const ChatMessage = ({ message }) => {
     return (
       <div className={`flex ${message.isUser ? "justify-end" : "justify-start"}`}>
         <div
@@ -13,4 +15,6 @@ export default function ChatMessage({ message }) {
       </div>
     );
   }
+
+export default ChatMessage;
   
