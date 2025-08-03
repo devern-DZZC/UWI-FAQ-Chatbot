@@ -2,6 +2,8 @@
 
 A full-stack AI-powered application that lets users ask natural language questions and receive accurate, context-aware answers from their own custom data sources — using RAG (Retrieval-Augmented Generation), OpenAI GPT models, and modern web technologies.
 
+🚀 Live Demo: https://ask-uwi.azurewebsites.net
+
 ---
 
 ## ✨ Features
