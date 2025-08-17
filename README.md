@@ -1,8 +1,9 @@
 # 🔍 AskUWI: Retrieval-Augmented Question Answering App
 
-A full-stack AI-powered application that lets users ask natural language questions and receive accurate, context-aware answers from their own custom data sources — using RAG (Retrieval-Augmented Generation), OpenAI GPT models, and modern web technologies.
+A full-stack AI-powered application that lets students ask natural language questions and receive accurate, context-aware answers from official UWI Faculty and FAQ documents — using RAG (Retrieval-Augmented Generation), OpenAI GPT models, and modern web technologies.
 
-🚀 Live Demo: https://ask-uwi.azurewebsites.net
+Live Demo: https://ask-uwi.azurewebsites.net  
+Demo Video: https://www.youtube.com/watch?v=bC1Jhql9CH4
 
 ---
 
